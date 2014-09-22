@@ -25,9 +25,16 @@ struct Candidate<'a, V: 'a> {
 
 
 fn is_punctuation(ch: char) -> bool {
-    let punct = &"/|-.\\:,;";
+    let punct = &"/|-.\\:,;+()";
     punct.contains_char(ch)
 }
+
+#[deriving(Show)]
+enum TermType {
+    Exact, Fuzzy, WholeWord, FuzzyWholeWord
+}
+
+type STree = SuffixTree<char, (TermType, String)>;
 
 pub fn main() {
     let args: Args = FlagParser::parse().unwrap_or_else(|e| e.exit());
@@ -37,17 +44,23 @@ pub fn main() {
     // read in dictionary
     let dict_path = Path::new(args.arg_DICT);
     let mut dict_reader = BufferedReader::new(File::open(&dict_path));
-    let mut dict: SuffixTree<char, String> = SuffixTree::new();
+    let mut dict: STree = SuffixTree::new();
     for i in dict_reader.lines() {
         let i = i.unwrap();
         let parts: Vec<&str> = i.as_slice().trim_right_chars('\n').splitn(1, '\t').collect();
         match parts.len() {
             2 => {
                 let t: Vec<char> = parts[1].chars().collect();
-                let fuzzy = t.iter().map(|c| if is_punctuation(*c) { '.' } else { c.to_lowercase() })
-                    .collect();
-                dict.insert(fuzzy, parts[0].to_string());
-                dict.insert(t, parts[0].to_string());
+                if expand_case {
+                    let fuzzy = t.iter().map(|c| if is_punctuation(*c) { '.' } else { c.to_lowercase() });
+                    dict.insert(fuzzy, (Fuzzy, parts[0].to_string()));
+                }
+                if words_only {
+                    let fuzzy = t.iter().map(|c| if is_punctuation(*c) { '.' } else { c.to_lowercase() });
+                    dict.insert(Some(' ').into_iter().chain(fuzzy).chain(Some(' ').into_iter()),
+                                (FuzzyWholeWord, parts[0].to_string()));
+                }
+                dict.insert(t.into_iter(), (Exact, parts[0].to_string()));
             },
             _ => {}
         }
@@ -69,21 +82,15 @@ pub fn main() {
         |_| Vec::new()
     };
 
-    let start_pred = if words_only {
-        |c: char| c.is_whitespace()
-    } else {
-        |_| true
-    };
-
     for line in std::io::stdin().lines() {
         let line = line.unwrap();
-        let matches = find_matches(&dict, |c| start_pred(c),
-                                   |c| expand(c), line.as_slice().chars());
+        let matches = find_matches(&dict, |c| expand(c), line.as_slice().chars());
 
         for m in matches.iter() {
-            println!("{}\t{}\t{}\t{}\t{}", m.start, m.end,
+            let &(ref ty, ref value) = m.node.value.as_ref().unwrap();
+            println!("{}\t{}\t{}\t{}\t{}\t{}", m.start, m.end,
                      String::from_chars(m.seq.as_slice()), m.strict,
-                     m.node.value.as_ref().unwrap());
+                     ty, value);
         }
         println!("");
     }
@@ -99,34 +106,30 @@ struct Match<'a, V: 'a> {
 
 fn find_matches<'a, Iter: Iterator<char>, V>
     (dict: &'a SuffixTree<char, V>,
-     start_pred: |char| -> bool,
      expand: |char| -> Vec<char>,
      iter: Iter) -> Vec<Match<'a, V>> {
 
     let mut cands: Vec<Candidate<V>> = Vec::new();
     let mut matches: Vec<Match<V>> = Vec::new();
-    let mut start = true;
     for (offset, ch) in iter.enumerate() {
-        if start {
-            cands.push(Candidate {cursor: Cursor::new(dict),
-                                  strict: true});
-            start = false;
-        }
+        cands.push(Candidate {cursor: Cursor::new(dict),
+                              strict: true});
 
         cands = cands.into_iter().flat_map(|cand: Candidate<'a, V>| {
-            let new_cands: Vec<Candidate<V>> = match cand.cursor.clone().go(ch) {
-                Some(next) => vec!(Candidate {cursor: next, strict: cand.strict}),
-                None => {
-                    let new: Vec<Candidate<V>> =
-                        expand(ch).into_iter().filter_map(|ex_ch| {
-                            match cand.cursor.clone().go(ex_ch) {
-                                Some(ex_cur) => Some(Candidate {cursor: ex_cur,
-                                                                strict: false}),
-                                None => None,
-                            }
-                        }).collect();
-                    new
-                }
+            let new_cands: Vec<Candidate<V>> =
+                match cand.cursor.clone().go(ch) {
+                    Some(next) => vec!(Candidate {cursor: next, strict: cand.strict}),
+                    None => {
+                        let new: Vec<Candidate<V>> =
+                            expand(ch).into_iter().filter_map(|ex_ch| {
+                                match cand.cursor.clone().go(ex_ch) {
+                                    Some(ex_cur) => Some(Candidate {cursor: ex_cur,
+                                                                    strict: false}),
+                                    None => None,
+                                }
+                            }).collect();
+                        new
+                    }
             };
             new_cands.into_iter()
         }).collect();
@@ -142,9 +145,6 @@ fn find_matches<'a, Iter: Iterator<char>, V>
                     strict: cand.strict,
                 });
             }
-        }
-        if start_pred(ch) {
-            start = true;
         }
     }
     matches
@@ -170,10 +170,10 @@ pub mod suffix_tree {
             self.value.is_some()
         }
 
-        pub fn insert(&mut self, el: Vec<E>, value: V) {
+        pub fn insert<Iter: Iterator<E>>(&mut self, mut el: Iter, value: V) {
             unsafe {
                 let mut tree: *mut SuffixTree<E, V> = self;
-                for i in el.into_iter() {
+                for i in el {
                     let new = match (*tree).suffixes.find_mut(&i) {
                         Some(next) => next as *mut SuffixTree<E, V>,
                         None => {
