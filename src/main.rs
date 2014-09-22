@@ -1,10 +1,23 @@
 extern crate collections;
+#![feature(phase)]
+extern crate serialize;
+#[phase(plugin)] extern crate docopt_macros;
+extern crate docopt;
 
 use std::io::{BufferedReader, File};
+use docopt::FlagParser;
 use suffix_tree::{SuffixTree, Cursor};
 
+docopt!(Args, "
+Usage: name-tagger [-w] DICT
+
+Options:
+    -w, --words-only  Only allow matches to start on word boundaries
+")
+
 pub fn main() {
-    let words_only = true;
+    let args: Args = FlagParser::parse().unwrap_or_else(|e| e.exit());
+    let words_only = args.flag_w;
 
     // read in dictionary
     let args = std::os::args();
