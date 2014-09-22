@@ -17,7 +17,7 @@ pub fn main() {
 
     for line in std::io::stdin().lines() {
         let line = line.unwrap();
-        let matches = find_matches(&dict, line.as_slice().chars());
+        let matches = find_matches(&dict, |c| c.is_whitespace(), line.as_slice().chars());
         for m in matches.iter() {
             println!("{}\t{}\t{}", m.start, m.end,
                      String::from_chars(m.seq.as_slice()));
@@ -33,12 +33,17 @@ struct Match<'a, E: 'a> {
 }
 
 fn find_matches<'a, E: Clone + Ord, Iter: Iterator<E>>
-    (dict: &'a SuffixTree<E>, iter: Iter) -> Vec<Match<'a, E>> {
+    (dict: &'a SuffixTree<E>, start_pred: |E| -> bool, iter: Iter) -> Vec<Match<'a, E>> {
 
     let mut cursors: Vec<Cursor<E>> = Vec::new();
     let mut matches = Vec::new();
+    let mut start = true;
     for (offset, ch) in iter.enumerate() {
-        cursors.push(Cursor::new(dict));
+        if start {
+            cursors.push(Cursor::new(dict));
+            start = false;
+        }
+
         cursors = cursors.into_iter().filter_map(|cur| cur.go(ch.clone())).collect();
         for cur in cursors.iter() {
             if cur.get().is_terminal() {
@@ -49,6 +54,9 @@ fn find_matches<'a, E: Clone + Ord, Iter: Iterator<E>>
                     seq: cur.path.clone(),
                 });
             }
+        }
+        if start_pred(ch) {
+            start = true;
         }
     }
     matches
