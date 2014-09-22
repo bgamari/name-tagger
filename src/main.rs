@@ -4,12 +4,13 @@ use std::io::{BufferedReader, File};
 use suffix_tree::{SuffixTree, Cursor};
 
 pub fn main() {
-    let mut dict: SuffixTree<char> = SuffixTree::new();
+    let words_only = true;
 
     // read in dictionary
     let args = std::os::args();
     let dict_path = Path::new(args[1].clone());
     let mut dict_reader = BufferedReader::new(File::open(&dict_path));
+    let mut dict: SuffixTree<char> = SuffixTree::new();
     for i in dict_reader.lines() {
         let t: Vec<char> = i.unwrap().as_slice().trim().chars().collect();
         dict.insert(t);
@@ -17,7 +18,13 @@ pub fn main() {
 
     for line in std::io::stdin().lines() {
         let line = line.unwrap();
-        let matches = find_matches(&dict, |c| c.is_whitespace(), line.as_slice().chars());
+        let matches = 
+            if words_only {
+                find_matches(&dict, |c| c.is_whitespace(), line.as_slice().chars())
+            } else {
+                find_matches(&dict, |_| true, line.as_slice().chars())
+            };
+
         for m in matches.iter() {
             println!("{}\t{}\t{}", m.start, m.end,
                      String::from_chars(m.seq.as_slice()));
