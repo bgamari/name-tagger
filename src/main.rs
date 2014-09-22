@@ -23,6 +23,12 @@ struct Candidate<'a, V: 'a> {
     strict: bool,
 }
 
+
+fn is_punctuation(ch: char) -> bool {
+    let punct = &"/|-.\\:,;";
+    punct.contains_char(ch)
+}
+
 pub fn main() {
     let args: Args = FlagParser::parse().unwrap_or_else(|e| e.exit());
     let words_only = args.flag_words_only;
@@ -38,6 +44,9 @@ pub fn main() {
         match parts.len() {
             2 => {
                 let t: Vec<char> = parts[1].chars().collect();
+                let fuzzy = t.iter().map(|c| if is_punctuation(*c) { '.' } else { c.to_lowercase() })
+                    .collect();
+                dict.insert(fuzzy, parts[0].to_string());
                 dict.insert(t, parts[0].to_string());
             },
             _ => {}
@@ -48,8 +57,12 @@ pub fn main() {
         |ch: char| -> Vec<char> {
             if ch.is_lowercase() {
                 vec!(ch.to_uppercase())
-            } else {
+            } else if ch.is_uppercase() {
                 vec!(ch.to_lowercase())
+            } else if is_punctuation(ch) {
+                vec!('.')
+            } else {
+                vec!()
             }
         }
     } else {
@@ -70,7 +83,7 @@ pub fn main() {
         for m in matches.iter() {
             println!("{}\t{}\t{}\t{}\t{}", m.start, m.end,
                      String::from_chars(m.seq.as_slice()), m.strict,
-                     m.node.value);
+                     m.node.value.as_ref().unwrap());
         }
         println!("");
     }
