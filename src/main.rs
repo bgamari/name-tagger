@@ -10,15 +10,23 @@ use docopt::FlagParser;
 use suffix_tree::{SuffixTree, Cursor};
 
 docopt!(Args, "
-Usage: name-tagger [-w] DICT
+Usage: name-tagger [-w] [-i] DICT
 
 Options:
-    -w, --words-only  Only allow matches to start on word boundaries
+    -w, --words-only        Only allow matches to start on word boundaries
+    -i, --case-insensitive  Only allow matches to start on word boundaries
 ")
+
+#[deriving(Clone)]
+struct Candidate<'a> {
+    cursor: Cursor<'a, char>,
+    strict: bool,
+}
 
 pub fn main() {
     let args: Args = FlagParser::parse().unwrap_or_else(|e| e.exit());
     let words_only = args.flag_words_only;
+    let expand_case = args.flag_case_insensitive;
 
     // read in dictionary
     let dict_path = Path::new(args.arg_DICT);
@@ -29,49 +37,86 @@ pub fn main() {
         dict.insert(t);
     }
 
+    let expand = if expand_case {
+        |ch: char| -> Vec<char> {
+            if ch.is_lowercase() {
+                vec!(ch.to_uppercase())
+            } else {
+                vec!(ch.to_lowercase())
+            }
+        }
+    } else {
+        |_| Vec::new()
+    };
+
+    let start_pred = if words_only {
+        |c: char| c.is_whitespace()
+    } else {
+        |_| true
+    };
+
     for line in std::io::stdin().lines() {
         let line = line.unwrap();
-        let matches = 
-            if words_only {
-                find_matches(&dict, |c| c.is_whitespace(), line.as_slice().chars())
-            } else {
-                find_matches(&dict, |_| true, line.as_slice().chars())
-            };
+        let matches = find_matches(&dict, |c| start_pred(c),
+                                   |c| expand(c), line.as_slice().chars());
 
         for m in matches.iter() {
-            println!("{}\t{}\t{}", m.start, m.end,
-                     String::from_chars(m.seq.as_slice()));
+            println!("{}\t{}\t{}\t{}", m.start, m.end,
+                     String::from_chars(m.seq.as_slice()), m.strict);
         }
         println!("");
     }
 }
 
-struct Match<'a, E: 'a> {
+struct Match {
     start: uint,
     end: uint,
-    seq: Vec<E>
+    seq: Vec<char>,
+    strict: bool,
 }
 
-fn find_matches<'a, E: Clone + Ord, Iter: Iterator<E>>
-    (dict: &'a SuffixTree<E>, start_pred: |E| -> bool, iter: Iter) -> Vec<Match<'a, E>> {
+fn find_matches<'a, Iter: Iterator<char>>
+    (dict: &'a SuffixTree<char>,
+     start_pred: |char| -> bool,
+     expand: |char| -> Vec<char>,
+     iter: Iter) -> Vec<Match> {
 
-    let mut cursors: Vec<Cursor<E>> = Vec::new();
+    let mut cands: Vec<Candidate> = Vec::new();
     let mut matches = Vec::new();
     let mut start = true;
     for (offset, ch) in iter.enumerate() {
         if start {
-            cursors.push(Cursor::new(dict));
+            cands.push(Candidate {cursor: Cursor::new(dict),
+                                  strict: true});
             start = false;
         }
 
-        cursors = cursors.into_iter().filter_map(|cur| cur.go(ch.clone())).collect();
-        for cur in cursors.iter() {
-            if cur.get().is_terminal() {
+        cands = cands.into_iter().flat_map(|cand: Candidate<'a>| {
+            let new_cands: Vec<Candidate> = match cand.cursor.clone().go(ch) {
+                Some(next) => vec!(Candidate {cursor: next, strict: cand.strict}),
+                None => {
+                    let new: Vec<Candidate> =
+                        expand(ch).into_iter().filter_map(|ex_ch| {
+                            match cand.cursor.clone().go(ex_ch) {
+                                Some(ex_cur) => Some(Candidate {cursor: ex_cur,
+                                                                strict: false}),
+                                None => None,
+                            }
+                        }).collect();
+                    new
+                }
+            };
+            new_cands.into_iter()
+        }).collect();
+
+        for cand in cands.iter() {
+            if cand.cursor.get().is_terminal() {
                 // we have a hit
                 matches.push(Match{
-                    start: 1 + offset - cur.path.len(),
+                    start: 1 + offset - cand.cursor.path.len(),
                     end: 1 + offset,
-                    seq: cur.path.clone(),
+                    seq: cand.cursor.path.clone(),
+                    strict: cand.strict,
                 });
             }
         }
@@ -120,6 +165,7 @@ pub mod suffix_tree {
         }
     }
 
+    #[deriving(Clone)]
     pub struct Cursor<'a, E: 'a> {
         cursor: &'a SuffixTree<E>,
         pub path: Vec<E>,
