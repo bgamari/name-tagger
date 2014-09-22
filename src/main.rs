@@ -44,7 +44,7 @@ fn find_matches<'a, E: Clone + Ord, Iter: Iterator<E>>
             if cur.get().is_terminal() {
                 // we have a hit
                 matches.push(Match{
-                    start: offset - cur.path.len(),
+                    start: 1 + offset - cur.path.len(),
                     end: offset,
                     seq: cur.path.clone(),
                 });
