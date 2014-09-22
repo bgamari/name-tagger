@@ -19,7 +19,7 @@ pub fn main() {
         let line = line.unwrap();
         let matches = find_matches(&dict, line.as_slice().chars());
         for m in matches.iter() {
-            println!("{}\t{}\t{}\n", m.start, m.end,
+            println!("{}\t{}\t{}", m.start, m.end,
                      String::from_chars(m.seq.as_slice()));
         }
         println!("");
