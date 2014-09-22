@@ -19,7 +19,7 @@ Options:
 
 #[deriving(Clone)]
 struct Candidate<'a> {
-    cursor: Cursor<'a, char>,
+    cursor: Cursor<'a, char, int>,
     strict: bool,
 }
 
@@ -31,10 +31,18 @@ pub fn main() {
     // read in dictionary
     let dict_path = Path::new(args.arg_DICT);
     let mut dict_reader = BufferedReader::new(File::open(&dict_path));
-    let mut dict: SuffixTree<char> = SuffixTree::new();
+    let mut dict: SuffixTree<char, int> = SuffixTree::new();
     for i in dict_reader.lines() {
-        let t: Vec<char> = i.unwrap().as_slice().trim().chars().collect();
-        dict.insert(t);
+        let i = i.unwrap();
+        let parts: Vec<&str> = i.as_slice().trim_right_chars('\n').splitn(1, '\t').collect();
+        match parts.len() {
+            2 => {
+                let t: Vec<char> = parts[1].chars().collect();
+                let v: int = from_str(parts[0]).unwrap();
+                dict.insert(t, v);
+            },
+            _ => {}
+        }
     }
 
     let expand = if expand_case {
@@ -76,7 +84,7 @@ struct Match {
 }
 
 fn find_matches<'a, Iter: Iterator<char>>
-    (dict: &'a SuffixTree<char>,
+    (dict: &'a SuffixTree<char, int>,
      start_pred: |char| -> bool,
      expand: |char| -> Vec<char>,
      iter: Iter) -> Vec<Match> {
@@ -130,56 +138,56 @@ fn find_matches<'a, Iter: Iterator<char>>
 pub mod suffix_tree {
     use collections::treemap::TreeMap;
 
-    pub struct SuffixTree<E> {
-        suffixes: TreeMap<E, SuffixTree<E>>,
-        terminal: bool,
+    pub struct SuffixTree<E, V> {
+        suffixes: TreeMap<E, SuffixTree<E, V>>,
+        value: Option<V>,
     }
 
-    impl<E: Ord + Clone> SuffixTree<E> {
-        pub fn new() -> SuffixTree<E> {
+    impl<E: Ord + Clone, V> SuffixTree<E, V> {
+        pub fn new() -> SuffixTree<E, V> {
             SuffixTree {
                 suffixes: TreeMap::new(),
-                terminal: false,
+                value: None,
             }
         }
 
         pub fn is_terminal(&self) -> bool {
-            self.terminal
+            self.value.is_some()
         }
 
-        pub fn insert(&mut self, el: Vec<E>) {
+        pub fn insert(&mut self, el: Vec<E>, value: V) {
             unsafe {
-                let mut tree: *mut SuffixTree<E> = self;
+                let mut tree: *mut SuffixTree<E, V> = self;
                 for i in el.into_iter() {
                     let new = match (*tree).suffixes.find_mut(&i) {
-                        Some(next) => next as *mut SuffixTree<E>,
+                        Some(next) => next as *mut SuffixTree<E, V>,
                         None => {
                             (*tree).suffixes.insert(i.clone(), SuffixTree::new());
-                            (*tree).suffixes.find_mut(&i).unwrap() as *mut SuffixTree<E>
+                            (*tree).suffixes.find_mut(&i).unwrap() as *mut SuffixTree<E, V>
                         }
                     };
                     tree = new;
                 }
-                (*tree).terminal = true;
+                (*tree).value = Some(value);
             }
         }
     }
 
     #[deriving(Clone)]
-    pub struct Cursor<'a, E: 'a> {
-        cursor: &'a SuffixTree<E>,
+    pub struct Cursor<'a, E: 'a, V: 'a> {
+        cursor: &'a SuffixTree<E, V>,
         pub path: Vec<E>,
     }
 
-    impl<'a, E: Ord> Cursor<'a, E> {
-        pub fn new(array: &'a SuffixTree<E>) -> Cursor<'a, E> {
+    impl<'a, E: Ord, V> Cursor<'a, E, V> {
+        pub fn new(array: &'a SuffixTree<E, V>) -> Cursor<'a, E, V> {
             Cursor {
                 cursor: array,
                 path: Vec::new(),
             }
         }
 
-        pub fn go(mut self, el: E) -> Option<Cursor<'a, E>> {
+        pub fn go(mut self, el: E) -> Option<Cursor<'a, E, V>> {
             match self.cursor.suffixes.find(&el) {
                 Some(next) => {
                     self.cursor = next;
@@ -190,7 +198,7 @@ pub mod suffix_tree {
             }
         }
 
-        pub fn get(&self) -> &'a SuffixTree<E> {
+        pub fn get(&self) -> &'a SuffixTree<E, V> {
             self.cursor
         }
     }
