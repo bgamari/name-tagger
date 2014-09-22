@@ -1,5 +1,6 @@
-extern crate collections;
 #![feature(phase)]
+
+extern crate collections;
 extern crate serialize;
 #[phase(plugin)] extern crate docopt_macros;
 extern crate docopt;
@@ -17,11 +18,10 @@ Options:
 
 pub fn main() {
     let args: Args = FlagParser::parse().unwrap_or_else(|e| e.exit());
-    let words_only = args.flag_w;
+    let words_only = args.flag_words_only;
 
     // read in dictionary
-    let args = std::os::args();
-    let dict_path = Path::new(args[1].clone());
+    let dict_path = Path::new(args.arg_DICT);
     let mut dict_reader = BufferedReader::new(File::open(&dict_path));
     let mut dict: SuffixTree<char> = SuffixTree::new();
     for i in dict_reader.lines() {
