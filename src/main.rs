@@ -33,12 +33,11 @@ struct Match<'a, E: 'a> {
 }
 
 fn find_matches<'a, E: Clone + Ord, Iter: Iterator<E>>
-    (dict: &'a SuffixTree<E>, mut iter: Iter) -> Vec<Match<'a, E>> {
+    (dict: &'a SuffixTree<E>, iter: Iter) -> Vec<Match<'a, E>> {
 
-    let mut offset: uint = 0;
     let mut cursors: Vec<Cursor<E>> = Vec::new();
     let mut matches = Vec::new();
-    for ch in iter {
+    for (offset, ch) in iter.enumerate() {
         cursors.push(Cursor::new(dict));
         cursors = cursors.into_iter().filter_map(|cur| cur.go(ch.clone())).collect();
         for cur in cursors.iter() {
@@ -51,7 +50,6 @@ fn find_matches<'a, E: Clone + Ord, Iter: Iterator<E>>
                 });
             }
         }
-        offset += 1; 
     }
     matches
 }
