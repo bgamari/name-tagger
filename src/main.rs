@@ -18,8 +18,8 @@ Options:
 ")
 
 #[deriving(Clone)]
-struct Candidate<'a> {
-    cursor: Cursor<'a, char, int>,
+struct Candidate<'a, V: 'a> {
+    cursor: Cursor<'a, char, V>,
     strict: bool,
 }
 
@@ -31,15 +31,14 @@ pub fn main() {
     // read in dictionary
     let dict_path = Path::new(args.arg_DICT);
     let mut dict_reader = BufferedReader::new(File::open(&dict_path));
-    let mut dict: SuffixTree<char, int> = SuffixTree::new();
+    let mut dict: SuffixTree<char, String> = SuffixTree::new();
     for i in dict_reader.lines() {
         let i = i.unwrap();
         let parts: Vec<&str> = i.as_slice().trim_right_chars('\n').splitn(1, '\t').collect();
         match parts.len() {
             2 => {
                 let t: Vec<char> = parts[1].chars().collect();
-                let v: int = from_str(parts[0]).unwrap();
-                dict.insert(t, v);
+                dict.insert(t, parts[0].to_string());
             },
             _ => {}
         }
@@ -69,28 +68,30 @@ pub fn main() {
                                    |c| expand(c), line.as_slice().chars());
 
         for m in matches.iter() {
-            println!("{}\t{}\t{}\t{}", m.start, m.end,
-                     String::from_chars(m.seq.as_slice()), m.strict);
+            println!("{}\t{}\t{}\t{}\t{}", m.start, m.end,
+                     String::from_chars(m.seq.as_slice()), m.strict,
+                     m.node.value);
         }
         println!("");
     }
 }
 
-struct Match {
+struct Match<'a, V: 'a> {
     start: uint,
     end: uint,
     seq: Vec<char>,
+    node: &'a SuffixTree<char, V>,
     strict: bool,
 }
 
-fn find_matches<'a, Iter: Iterator<char>>
-    (dict: &'a SuffixTree<char, int>,
+fn find_matches<'a, Iter: Iterator<char>, V>
+    (dict: &'a SuffixTree<char, V>,
      start_pred: |char| -> bool,
      expand: |char| -> Vec<char>,
-     iter: Iter) -> Vec<Match> {
+     iter: Iter) -> Vec<Match<'a, V>> {
 
-    let mut cands: Vec<Candidate> = Vec::new();
-    let mut matches = Vec::new();
+    let mut cands: Vec<Candidate<V>> = Vec::new();
+    let mut matches: Vec<Match<V>> = Vec::new();
     let mut start = true;
     for (offset, ch) in iter.enumerate() {
         if start {
@@ -99,11 +100,11 @@ fn find_matches<'a, Iter: Iterator<char>>
             start = false;
         }
 
-        cands = cands.into_iter().flat_map(|cand: Candidate<'a>| {
-            let new_cands: Vec<Candidate> = match cand.cursor.clone().go(ch) {
+        cands = cands.into_iter().flat_map(|cand: Candidate<'a, V>| {
+            let new_cands: Vec<Candidate<V>> = match cand.cursor.clone().go(ch) {
                 Some(next) => vec!(Candidate {cursor: next, strict: cand.strict}),
                 None => {
-                    let new: Vec<Candidate> =
+                    let new: Vec<Candidate<V>> =
                         expand(ch).into_iter().filter_map(|ex_ch| {
                             match cand.cursor.clone().go(ex_ch) {
                                 Some(ex_cur) => Some(Candidate {cursor: ex_cur,
@@ -124,6 +125,7 @@ fn find_matches<'a, Iter: Iterator<char>>
                     start: 1 + offset - cand.cursor.path.len(),
                     end: 1 + offset,
                     seq: cand.cursor.path.clone(),
+                    node: cand.cursor.get(),
                     strict: cand.strict,
                 });
             }
@@ -140,7 +142,7 @@ pub mod suffix_tree {
 
     pub struct SuffixTree<E, V> {
         suffixes: TreeMap<E, SuffixTree<E, V>>,
-        value: Option<V>,
+        pub value: Option<V>,
     }
 
     impl<E: Ord + Clone, V> SuffixTree<E, V> {
@@ -173,10 +175,15 @@ pub mod suffix_tree {
         }
     }
 
-    #[deriving(Clone)]
     pub struct Cursor<'a, E: 'a, V: 'a> {
         cursor: &'a SuffixTree<E, V>,
         pub path: Vec<E>,
+    }
+
+    impl<'a, E: Clone, V> Clone for Cursor<'a, E, V> {
+        fn clone(&self) -> Cursor<'a, E, V> {
+            Cursor {cursor: self.cursor, path: self.path.clone()}
+        }
     }
 
     impl<'a, E: Ord, V> Cursor<'a, E, V> {
