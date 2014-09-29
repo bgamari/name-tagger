@@ -130,22 +130,20 @@ fn find_matches<'a, Iter: Iterator<char>, V>
                               strict: true});
 
         cands = cands.into_iter().flat_map(|cand: Candidate<'a, V>| {
-            let new_cands: Vec<Candidate<V>> =
+            let exact_cands: Vec<Candidate<V>> =
                 match cand.cursor.clone().go(ch) {
                     Some(next) => vec!(Candidate {cursor: next, strict: cand.strict}),
-                    None => {
-                        let new: Vec<Candidate<V>> =
-                            expand(ch).into_iter().filter_map(|ex_ch| {
-                                match cand.cursor.clone().go(ex_ch) {
-                                    Some(ex_cur) => Some(Candidate {cursor: ex_cur,
-                                                                    strict: false}),
-                                    None => None,
-                                }
-                            }).collect();
-                        new
+                    None => vec!(),
+                };
+            let expanded_cands: Vec<Candidate<V>> =
+                expand(ch).into_iter().filter_map(|ex_ch| {
+                    match cand.cursor.clone().go(ex_ch) {
+                        Some(ex_cur) => Some(Candidate {cursor: ex_cur,
+                                                        strict: false}),
+                        None => None,
                     }
-            };
-            new_cands.into_iter()
+                }).collect();
+            exact_cands.into_iter().chain(expanded_cands.into_iter())
         }).collect();
 
         for cand in cands.iter() {
