@@ -51,18 +51,22 @@ pub fn main() {
         match parts.len() {
             2 => {
                 let t: Vec<char> = parts[1].chars().collect();
-                if fuzzy {
-                    let fuzzy = t.iter().map(|c| if is_punctuation(*c) { '.' } else { c.to_lowercase() });
-                    dict.insert(fuzzy, (Fuzzy, parts[0].to_string()));
-                }
                 if name_only {
-                    dict.insert(Some(' ').into_iter().chain(t.clone().into_iter()).chain(Some(' ').into_iter()),
+                    dict.insert(Some(' ').into_iter()
+                                .chain(t.clone().into_iter())
+                                .chain(Some(' ').into_iter()),
                                 (WholeWord, parts[0].to_string()));
 
-                    let fuzzy = t.iter().map(|c| if is_punctuation(*c) { '.' } else { c.to_lowercase() });
-                    dict.insert(Some(' ').into_iter().chain(fuzzy).chain(Some(' ').into_iter()),
-                                (FuzzyWholeWord, parts[0].to_string()));
+                    if fuzzy {
+                        let fuzzy = t.iter().map(|c| if is_punctuation(*c) { '.' } else { c.to_lowercase() });
+                        dict.insert(Some(' ').into_iter().chain(fuzzy).chain(Some(' ').into_iter()),
+                                    (FuzzyWholeWord, parts[0].to_string()));
+                    }
                 } else {
+                    if fuzzy {
+                        let fuzzy = t.iter().map(|c| if is_punctuation(*c) { '.' } else { c.to_lowercase() });
+                        dict.insert(fuzzy, (Fuzzy, parts[0].to_string()));
+                    }
                     dict.insert(t.into_iter(), (Exact, parts[0].to_string()));
                 }
             },
@@ -88,15 +92,17 @@ pub fn main() {
 
     for line in std::io::stdin().lines() {
         let line = line.unwrap();
-        let matches_exact = find_matches(&dict, |c| expand(c), line.as_slice().chars());
-        let matches_whole =
+        let line = line.as_slice().trim_right_chars('\n');
+        let matches =
             find_matches(&dict, |c| expand(c),
-                         Some(' ').into_iter().chain(line.as_slice().chars()).chain(Some(' ').into_iter()));
-        let mut matches = matches_exact.into_iter().chain(matches_whole.into_iter());
+                         Some(' ').into_iter()
+                         .chain(line.chars())
+                         .chain(Some(' ').into_iter()));
 
-        for m in matches {
+        for m in matches.into_iter() {
             let &(ref ty, ref value) = m.node.value.as_ref().unwrap();
-            println!("{}\t{}\t{}\t{}\t{}\t{}", m.start, m.end,
+            println!("{}\t{}\t{}\t{}\t{}\t{}",
+                     m.start, m.end,
                      String::from_chars(m.seq.as_slice()), m.strict,
                      ty, value);
         }
