@@ -20,7 +20,6 @@ Options:
 #[deriving(Clone)]
 struct Candidate<'a, V: 'a> {
     cursor: Cursor<'a, char, V>,
-    strict: bool,
 }
 
 
@@ -35,6 +34,14 @@ enum TermType {
 }
 
 type STree = SuffixTree<char, (TermType, String)>;
+
+pub fn normalize(ch: char) -> char {
+    if is_punctuation(ch) {
+        '.'
+    } else {
+        ch.to_lowercase()
+    }
+}
 
 pub fn main() {
     let args: Args = FlagParser::parse().unwrap_or_else(|e| e.exit());
@@ -58,43 +65,27 @@ pub fn main() {
                                 (WholeWord, parts[0].to_string()));
 
                     if fuzzy {
-                        let fuzzy = t.iter().map(|c| if is_punctuation(*c) { '.' } else { c.to_lowercase() });
-                        dict.insert(Some(' ').into_iter().chain(fuzzy).chain(Some(' ').into_iter()),
+                        let normalized = t.into_iter().map(|ch| normalize(ch));
+                        dict.insert(Some(' ').into_iter().chain(normalized).chain(Some(' ').into_iter()),
                                     (FuzzyWholeWord, parts[0].to_string()));
                     }
                 } else {
+                    dict.insert(t.clone().into_iter(), (Exact, parts[0].to_string()));
                     if fuzzy {
-                        let fuzzy = t.iter().map(|c| if is_punctuation(*c) { '.' } else { c.to_lowercase() });
-                        dict.insert(fuzzy, (Fuzzy, parts[0].to_string()));
+                        let normalized = t.into_iter().map(|ch| normalize(ch));
+                        dict.insert(normalized, (Fuzzy, parts[0].to_string()));
                     }
-                    dict.insert(t.into_iter(), (Exact, parts[0].to_string()));
                 }
             },
             _ => {}
         }
     }
 
-    let expand = if fuzzy {
-        |ch: char| -> Vec<char> {
-            if ch.is_lowercase() {
-                vec!(ch.to_uppercase())
-            } else if ch.is_uppercase() {
-                vec!(ch.to_lowercase())
-            } else if is_punctuation(ch) {
-                vec!('.')
-            } else {
-                vec!()
-            }
-        }
-    } else {
-        |_| Vec::new()
-    };
-
     for line in std::io::stdin().lines() {
         let line = line.unwrap();
         let line = line.as_slice().trim_right_chars('\n');
         let matches =
-            find_matches(&dict, |c| expand(c),
+            find_matches(&dict,
                          Some(' ').into_iter()
                          .chain(line.chars())
                          .chain(Some(' ').into_iter()));
@@ -103,7 +94,21 @@ pub fn main() {
             let &(ref ty, ref value) = m.node.value.as_ref().unwrap();
             println!("{}\t{}\t{}\t{}\t{}\t{}",
                      m.start, m.end,
-                     String::from_chars(m.seq.as_slice()), m.strict,
+                     String::from_chars(m.seq.as_slice()), true,
+                     ty, value);
+        }
+
+        let matches =
+            find_matches(&dict,
+                         Some(' ').into_iter()
+                         .chain(line.chars().map(|ch| normalize(ch)))
+                         .chain(Some(' ').into_iter()));
+
+        for m in matches.into_iter() {
+            let &(ref ty, ref value) = m.node.value.as_ref().unwrap();
+            println!("{}\t{}\t{}\t{}\t{}\t{}",
+                     m.start, m.end,
+                     String::from_chars(m.seq.as_slice()), false,
                      ty, value);
         }
         println!("");
@@ -115,35 +120,22 @@ struct Match<'a, V: 'a> {
     end: uint,
     seq: Vec<char>,
     node: &'a SuffixTree<char, V>,
-    strict: bool,
 }
 
 fn find_matches<'a, Iter: Iterator<char>, V>
     (dict: &'a SuffixTree<char, V>,
-     expand: |char| -> Vec<char>,
      iter: Iter) -> Vec<Match<'a, V>> {
 
     let mut cands: Vec<Candidate<V>> = Vec::new();
     let mut matches: Vec<Match<V>> = Vec::new();
     for (offset, ch) in iter.enumerate() {
-        cands.push(Candidate {cursor: Cursor::new(dict),
-                              strict: true});
+        cands.push(Candidate {cursor: Cursor::new(dict)});
 
         cands = cands.into_iter().flat_map(|cand: Candidate<'a, V>| {
-            let exact_cands: Vec<Candidate<V>> =
-                match cand.cursor.clone().go(ch) {
-                    Some(next) => vec!(Candidate {cursor: next, strict: cand.strict}),
-                    None => vec!(),
-                };
-            let expanded_cands: Vec<Candidate<V>> =
-                expand(ch).into_iter().filter_map(|ex_ch| {
-                    match cand.cursor.clone().go(ex_ch) {
-                        Some(ex_cur) => Some(Candidate {cursor: ex_cur,
-                                                        strict: false}),
-                        None => None,
-                    }
-                }).collect();
-            exact_cands.into_iter().chain(expanded_cands.into_iter())
+            match cand.cursor.clone().go(ch) {
+                Some(next) => vec!(Candidate {cursor: next}),
+                None => vec!(),
+            }.into_iter()
         }).collect();
 
         for cand in cands.iter() {
@@ -154,7 +146,6 @@ fn find_matches<'a, Iter: Iterator<char>, V>
                     end: 1 + offset,
                     seq: cand.cursor.path.clone(),
                     node: cand.cursor.get(),
-                    strict: cand.strict,
                 });
             }
         }
