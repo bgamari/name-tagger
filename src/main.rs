@@ -13,8 +13,8 @@ docopt!(Args, "
 Usage: name-tagger [-w] [-i] DICT
 
 Options:
-    -w, --words-only        Only allow matches to start on word boundaries
-    -i, --case-insensitive  Only allow matches to start on word boundaries
+    -w, --whole-name        Forbid matches of substrings of names
+    -i, --insensitive       Permit matches to differ from name in case and punctuation
 ")
 
 #[deriving(Clone)]
@@ -38,8 +38,8 @@ type STree = SuffixTree<char, (TermType, String)>;
 
 pub fn main() {
     let args: Args = FlagParser::parse().unwrap_or_else(|e| e.exit());
-    let words_only = args.flag_words_only;
-    let expand_case = args.flag_case_insensitive;
+    let name_only = args.flag_whole_name;
+    let fuzzy = args.flag_insensitive;
 
     // read in dictionary
     let dict_path = Path::new(args.arg_DICT);
@@ -51,22 +51,26 @@ pub fn main() {
         match parts.len() {
             2 => {
                 let t: Vec<char> = parts[1].chars().collect();
-                if expand_case {
+                if fuzzy {
                     let fuzzy = t.iter().map(|c| if is_punctuation(*c) { '.' } else { c.to_lowercase() });
                     dict.insert(fuzzy, (Fuzzy, parts[0].to_string()));
                 }
-                if words_only {
+                if name_only {
+                    dict.insert(Some(' ').into_iter().chain(t.clone().into_iter()).chain(Some(' ').into_iter()),
+                                (WholeWord, parts[0].to_string()));
+
                     let fuzzy = t.iter().map(|c| if is_punctuation(*c) { '.' } else { c.to_lowercase() });
                     dict.insert(Some(' ').into_iter().chain(fuzzy).chain(Some(' ').into_iter()),
                                 (FuzzyWholeWord, parts[0].to_string()));
+                } else {
+                    dict.insert(t.into_iter(), (Exact, parts[0].to_string()));
                 }
-                dict.insert(t.into_iter(), (Exact, parts[0].to_string()));
             },
             _ => {}
         }
     }
 
-    let expand = if expand_case {
+    let expand = if fuzzy {
         |ch: char| -> Vec<char> {
             if ch.is_lowercase() {
                 vec!(ch.to_uppercase())
@@ -84,9 +88,13 @@ pub fn main() {
 
     for line in std::io::stdin().lines() {
         let line = line.unwrap();
-        let matches = find_matches(&dict, |c| expand(c), line.as_slice().chars());
+        let matches_exact = find_matches(&dict, |c| expand(c), line.as_slice().chars());
+        let matches_whole =
+            find_matches(&dict, |c| expand(c),
+                         Some(' ').into_iter().chain(line.as_slice().chars()).chain(Some(' ').into_iter()));
+        let mut matches = matches_exact.into_iter().chain(matches_whole.into_iter());
 
-        for m in matches.iter() {
+        for m in matches {
             let &(ref ty, ref value) = m.node.value.as_ref().unwrap();
             println!("{}\t{}\t{}\t{}\t{}\t{}", m.start, m.end,
                      String::from_chars(m.seq.as_slice()), m.strict,
