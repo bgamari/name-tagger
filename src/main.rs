@@ -153,7 +153,7 @@ fn find_matches<'a, Iter: Iterator<char>, V>
 }
 
 pub mod suffix_tree {
-    use collections::treemap::TreeMap;
+    use collections::TreeMap;
 
     pub struct SuffixTree<E, V> {
         suffixes: TreeMap<E, SuffixTree<E, V>>,
