@@ -6,7 +6,6 @@ extern crate serialize;
 extern crate docopt;
 
 use std::io::{BufferedReader, File};
-use docopt::FlagParser;
 use suffix_tree::{SuffixTree, Cursor};
 
 docopt!(Args, "
@@ -44,7 +43,7 @@ pub fn normalize(ch: char) -> char {
 }
 
 pub fn main() {
-    let args: Args = FlagParser::parse().unwrap_or_else(|e| e.exit());
+    let args: Args = Args::docopt().decode().unwrap_or_else(|e| e.exit());
     let name_only = args.flag_whole_name;
     let fuzzy = args.flag_insensitive;
 
