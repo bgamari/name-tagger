@@ -92,7 +92,7 @@ pub fn main() {
         for m in matches.into_iter() {
             let &(ref ty, ref value) = m.node.value.as_ref().unwrap();
             println!("{}\t{}\t{}\t{}\t{}\t{}",
-                     m.start, m.end,
+                     m.start - 1, m.end - 1,
                      String::from_chars(m.seq.as_slice()), true,
                      ty, value);
         }
@@ -106,7 +106,7 @@ pub fn main() {
         for m in matches.into_iter() {
             let &(ref ty, ref value) = m.node.value.as_ref().unwrap();
             println!("{}\t{}\t{}\t{}\t{}\t{}",
-                     m.start, m.end,
+                     m.start - 1, m.end - 1,
                      String::from_chars(m.seq.as_slice()), false,
                      ty, value);
         }
