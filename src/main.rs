@@ -83,6 +83,7 @@ pub fn main() {
     }
 
     for line in std::io::stdin().lines() {
+        use std::iter::FromIterator;
         let line = line.unwrap();
         let line = line.as_slice().trim_right_chars('\n');
         let matches =
@@ -95,7 +96,7 @@ pub fn main() {
             let &(ref ty, ref value) = m.node.value.as_ref().unwrap();
             println!("{}\t{}\t{}\t{}\t{}\t{}",
                      m.start - 1, m.end - 1,
-                     String::from_chars(m.seq.as_slice()), true,
+                     FromIterator::from_iter(m.seq.as_slice()), true,
                      ty, value);
         }
 
@@ -109,7 +110,7 @@ pub fn main() {
             let &(ref ty, ref value) = m.node.value.as_ref().unwrap();
             println!("{}\t{}\t{}\t{}\t{}\t{}",
                      m.start - 1, m.end - 1,
-                     String::from_chars(m.seq.as_slice()), false,
+                     FromIterator::from_iter(m.seq.as_slice()), false,
                      ty, value);
         }
         println!("");
