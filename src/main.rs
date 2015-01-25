@@ -153,17 +153,17 @@ fn find_matches<'a, Iter: Iterator<char>, V>
 }
 
 pub mod suffix_tree {
-    use collections::TreeMap;
+    use collections::BTreeMap;
 
     pub struct SuffixTree<E, V> {
-        suffixes: TreeMap<E, SuffixTree<E, V>>,
+        suffixes: BTreeMap<E, SuffixTree<E, V>>,
         pub value: Option<V>,
     }
 
     impl<E: Ord + Clone, V> SuffixTree<E, V> {
         pub fn new() -> SuffixTree<E, V> {
             SuffixTree {
-                suffixes: TreeMap::new(),
+                suffixes: BTreeMap::new(),
                 value: None,
             }
         }
