@@ -124,7 +124,7 @@ struct Match<'a, V: 'a> {
     node: &'a SuffixTree<char, V>,
 }
 
-fn find_matches<'a, Iter: Iterator<char>, V>
+fn find_matches<'a, Iter: Iterator<Item=char>, V>
     (dict: &'a SuffixTree<char, V>,
      iter: Iter) -> Vec<Match<'a, V>> {
 
@@ -175,7 +175,7 @@ pub mod suffix_tree {
             self.value.is_some()
         }
 
-        pub fn insert<Iter: Iterator<E>>(&mut self, mut el: Iter, value: V) {
+        pub fn insert<Iter: Iterator<Item=E>>(&mut self, mut el: Iter, value: V) {
             unsafe {
                 let mut tree: *mut SuffixTree<E, V> = self;
                 for i in el {
