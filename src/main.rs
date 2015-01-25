@@ -115,8 +115,8 @@ pub fn main() {
 }
 
 struct Match<'a, V: 'a> {
-    start: uint,
-    end: uint,
+    start: usize,
+    end: usize,
     seq: Vec<char>,
     node: &'a SuffixTree<char, V>,
 }
