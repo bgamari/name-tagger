@@ -96,7 +96,7 @@ pub fn main() {
             let &(ref ty, ref value) = m.node.value.as_ref().unwrap();
             println!("{}\t{}\t{}\t{}\t{}\t{}",
                      m.start - 1, m.end - 1,
-                     FromIterator::from_iter(m.seq.as_slice()), true,
+                     FromIterator::from_iter(m.seq.iter()), true,
                      ty, value);
         }
 
@@ -110,7 +110,7 @@ pub fn main() {
             let &(ref ty, ref value) = m.node.value.as_ref().unwrap();
             println!("{}\t{}\t{}\t{}\t{}\t{}",
                      m.start - 1, m.end - 1,
-                     FromIterator::from_iter(m.seq.as_slice()), false,
+                     FromIterator::from_iter(m.seq.iter()), false,
                      ty, value);
         }
         println!("");
