@@ -55,7 +55,7 @@ pub fn main() {
     let mut dict: STree = SuffixTree::new();
     for i in dict_reader.lines() {
         let i = i.unwrap();
-        let parts: Vec<&str> = i.as_slice().trim_right_chars('\n').splitn(1, '\t').collect();
+        let parts: Vec<&str> = i.as_slice().trim_right_matches('\n').splitn(1, '\t').collect();
         match parts.len() {
             2 => {
                 let t: Vec<char> = parts[1].chars().collect();
@@ -85,7 +85,7 @@ pub fn main() {
     for line in std::io::stdin().lines() {
         use std::iter::FromIterator;
         let line = line.unwrap();
-        let line = line.as_slice().trim_right_chars('\n');
+        let line = line.as_slice().trim_right_matches('\n');
         let matches =
             find_matches(&dict,
                          Some(' ').into_iter()
