@@ -82,7 +82,7 @@ pub fn main() {
         }
     }
 
-    for line in std::io::stdin().lines() {
+    for line in std::io::stdin().lock().lines() {
         use std::iter::FromIterator;
         let line = line.unwrap();
         let line = line.as_slice().trim_right_matches('\n');
