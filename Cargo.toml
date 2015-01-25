@@ -4,5 +4,8 @@ name = "name-tagger"
 version = "0.0.1"
 authors = ["Ben Gamari <bgamari.foss@gmail.com>"]
 
+[dependencies.docopt]
+git = "git://github.com/docopt/docopt.rs"
+
 [dependencies.docopt_macros]
 git = "git://github.com/docopt/docopt.rs"

@@ -1,9 +1,9 @@
-#![feature(phase)]
+#![feature(plugin)]
 
 extern crate collections;
 extern crate serialize;
-#[phase(plugin)] extern crate docopt_macros;
 extern crate docopt;
+#[plugin] extern crate docopt_macros;
 
 use std::io::{BufferedReader, File};
 use suffix_tree::{SuffixTree, Cursor};
@@ -14,7 +14,7 @@ Usage: name-tagger [-w] [-i] DICT
 Options:
     -w, --whole-name        Forbid matches of substrings of names
     -i, --insensitive       Permit matches to differ from name in case and punctuation
-")
+");
 
 #[deriving(Clone)]
 struct Candidate<'a, V: 'a> {
