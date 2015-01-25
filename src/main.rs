@@ -179,11 +179,11 @@ pub mod suffix_tree {
             unsafe {
                 let mut tree: *mut SuffixTree<E, V> = self;
                 for i in el {
-                    let new = match (*tree).suffixes.find_mut(&i) {
+                    let new = match (*tree).suffixes.get_mut(&i) {
                         Some(next) => next as *mut SuffixTree<E, V>,
                         None => {
                             (*tree).suffixes.insert(i.clone(), SuffixTree::new());
-                            (*tree).suffixes.find_mut(&i).unwrap() as *mut SuffixTree<E, V>
+                            (*tree).suffixes.get_mut(&i).unwrap() as *mut SuffixTree<E, V>
                         }
                     };
                     tree = new;
@@ -213,7 +213,7 @@ pub mod suffix_tree {
         }
 
         pub fn go(mut self, el: E) -> Option<Cursor<'a, E, V>> {
-            match self.cursor.suffixes.find(&el) {
+            match self.cursor.suffixes.get(&el) {
                 Some(next) => {
                     self.cursor = next;
                     self.path.push(el);
