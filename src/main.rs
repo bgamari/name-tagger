@@ -18,7 +18,7 @@ Options:
     -i, --insensitive       Permit matches to differ from name in case and punctuation
 ");
 
-#[deriving(Clone)]
+#[derive(Clone)]
 struct Candidate<'a, V: 'a> {
     cursor: Cursor<'a, char, V>,
 }
@@ -29,7 +29,7 @@ fn is_punctuation(ch: char) -> bool {
     punct.contains_char(ch)
 }
 
-#[deriving(Show)]
+#[derive(Show, Copy)]
 enum TermType {
     Exact, Fuzzy, WholeWord, FuzzyWholeWord
 }
@@ -93,11 +93,10 @@ pub fn main() {
                          .chain(Some(' ').into_iter()));
 
         for m in matches.into_iter() {
-            let &(ref ty, ref value) = m.node.value.as_ref().unwrap();
-            println!("{}\t{}\t{}\t{}\t{}\t{}",
-                     m.start - 1, m.end - 1,
-                     FromIterator::from_iter(m.seq.iter()), true,
-                     ty, value);
+            let &(ty, ref value) = m.node.value.as_ref().unwrap();
+            let seq: String = FromIterator::from_iter(m.seq.into_iter());
+            println!("{}\t{}\t{}\t{}\t{:?}\t{}",
+                     m.start - 1, m.end - 1, seq, true, ty, value);
         }
 
         let matches =
@@ -107,11 +106,10 @@ pub fn main() {
                          .chain(Some(' ').into_iter()));
 
         for m in matches.into_iter() {
-            let &(ref ty, ref value) = m.node.value.as_ref().unwrap();
-            println!("{}\t{}\t{}\t{}\t{}\t{}",
-                     m.start - 1, m.end - 1,
-                     FromIterator::from_iter(m.seq.iter()), false,
-                     ty, value);
+            let &(ty, ref value) = m.node.value.as_ref().unwrap();
+            let seq: String = FromIterator::from_iter(m.seq.into_iter());
+            println!("{}\t{}\t{}\t{}\t{:?}\t{}",
+                     m.start - 1, m.end - 1, seq, false, ty, value);
         }
         println!("");
     }
