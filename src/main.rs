@@ -63,18 +63,18 @@ pub fn main() {
                     dict.insert(Some(' ').into_iter()
                                 .chain(t.clone().into_iter())
                                 .chain(Some(' ').into_iter()),
-                                (WholeWord, parts[0].to_string()));
+                                (TermType::WholeWord, parts[0].to_string()));
 
                     if fuzzy {
                         let normalized = t.into_iter().map(|ch| normalize(ch));
                         dict.insert(Some(' ').into_iter().chain(normalized).chain(Some(' ').into_iter()),
-                                    (FuzzyWholeWord, parts[0].to_string()));
+                                    (TermType::FuzzyWholeWord, parts[0].to_string()));
                     }
                 } else {
-                    dict.insert(t.clone().into_iter(), (Exact, parts[0].to_string()));
+                    dict.insert(t.clone().into_iter(), (TermType::Exact, parts[0].to_string()));
                     if fuzzy {
                         let normalized = t.into_iter().map(|ch| normalize(ch));
-                        dict.insert(normalized, (Fuzzy, parts[0].to_string()));
+                        dict.insert(normalized, (TermType::Fuzzy, parts[0].to_string()));
                     }
                 }
             },
