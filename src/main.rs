@@ -2,7 +2,9 @@
 
 extern crate collections;
 extern crate serialize;
+
 extern crate docopt;
+extern crate "rustc-serialize" as rustc_serialize;
 #[plugin] extern crate docopt_macros;
 
 use std::io::{BufferedReader, File};
