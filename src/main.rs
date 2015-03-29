@@ -1,13 +1,15 @@
-#![feature(plugin)]
+#![feature(plugin, collections)]
 #![plugin(docopt_macros)]
 
 extern crate collections;
 
 extern crate docopt;
 extern crate rustc_serialize;
+extern crate unicode;
 
 use std::io::{BufReader, BufRead};
 use std::fs::File;
+use std::iter;
 use std::path::Path;
 use std::char::ToLowercase;
 use suffix_tree::{SuffixTree, Cursor};
@@ -28,7 +30,7 @@ struct Candidate<'a, V: 'a> {
 
 fn is_punctuation(ch: char) -> bool {
     let punct = &"/|-.\\:,;+()";
-    punct.contains_char(ch)
+    punct.contains(ch)
 }
 
 #[derive(Debug, Copy)]
@@ -38,28 +40,9 @@ enum TermType {
 
 type STree = SuffixTree<char, (TermType, String)>;
 
-enum Normalize<Iter: Iterator<Item=char>> {
-    Char {nextChar: Iter},
-    Lower {nextChar: ToLowercase, remaining: Iter}
-}
-
-impl<Iter: Iterator<Item=char>> Iterator for Normalize<Iter> {
-    type Item = char;
-    fn next(&mut self) -> Option<char> {
-        match self {
-            &mut Normalize::Char {nextChar: ref mut next} => next.next(),
-            &mut Normalize::Lower {nextChar: ref mut next, remaining: ref mut rem} => {
-                match next.next() {
-                    None => rem.next(),
-                    ch => ch
-                }
-            }
-        }
-    }
-}
-
-fn normalize<Iter: Iterator<Item=char>>(str: Iter) -> Normalize<Iter> {
-    Normalize::Char {nextChar: str}
+fn normalize<Iter: Iterator<Item=char>>(str: Iter) -> iter::FlatMap<iter::Map<Iter>, unicode::char::ToLowercase> {
+    str.map(|ch| if is_punctuation(ch) { '.' } else { ch })
+        .flat_map(|ch| ch.to_lowercase())
 }
 
 pub fn main() {
@@ -69,11 +52,11 @@ pub fn main() {
 
     // read in dictionary
     let dict_path = Path::new(&args.arg_DICT);
-    let mut dict_reader = BufReader::new(File::open(&dict_path).unwrap());
+    let dict_reader = BufReader::new(File::open(&dict_path).unwrap());
     let mut dict: STree = SuffixTree::new();
     for i in dict_reader.lines() {
         let i = i.unwrap();
-        let parts: Vec<&str> = i.as_slice().trim_right_matches('\n').splitn(1, '\t').collect();
+        let parts: Vec<&str> = i.trim_right_matches('\n').splitn(1, '\t').collect();
         match parts.len() {
             2 => {
                 let t: Vec<char> = parts[1].chars().collect();
@@ -104,7 +87,7 @@ pub fn main() {
     for line in stdin.lock().lines() {
         use std::iter::FromIterator;
         let line = line.unwrap();
-        let line = line.as_slice().trim_right_matches('\n');
+        let line = line.trim_right_matches('\n');
         let matches =
             find_matches(&dict,
                          Some(' ').into_iter()
@@ -192,7 +175,7 @@ pub mod suffix_tree {
             self.value.is_some()
         }
 
-        pub fn insert<Iter: Iterator<Item=E>>(&mut self, mut el: Iter, value: V) {
+        pub fn insert<Iter: Iterator<Item=E>>(&mut self, el: Iter, value: V) {
             unsafe {
                 let mut tree: *mut SuffixTree<E, V> = self;
                 for i in el {
