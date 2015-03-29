@@ -1,4 +1,4 @@
-#![feature(plugin, collections)]
+#![feature(plugin, collections,unicode)]
 #![plugin(docopt_macros)]
 
 extern crate collections;
@@ -9,9 +9,7 @@ extern crate unicode;
 
 use std::io::{BufReader, BufRead};
 use std::fs::File;
-use std::iter;
 use std::path::Path;
-use std::char::ToLowercase;
 use suffix_tree::{SuffixTree, Cursor};
 
 docopt!(Args, "
@@ -40,9 +38,14 @@ enum TermType {
 
 type STree = SuffixTree<char, (TermType, String)>;
 
-fn normalize<Iter: Iterator<Item=char>>(str: Iter) -> iter::FlatMap<iter::Map<Iter>, unicode::char::ToLowercase> {
-    str.map(|ch| if is_punctuation(ch) { '.' } else { ch })
-        .flat_map(|ch| ch.to_lowercase())
+//let norma = str.map(|ch| if is_punctuation(ch) { '.' } else { ch }).flat_map(|ch| ch.to_lowercase())
+
+
+fn normalize<'a, Iter: Iterator<Item=char> + 'a>(str: Iter) -> Box<Iterator<Item=char> + 'a> {
+    Box::new(
+	    str.map(|ch| if is_punctuation(ch) { '.' } else { ch })
+	    .flat_map(|ch| ch.to_lowercase())
+    )
 }
 
 pub fn main() {
