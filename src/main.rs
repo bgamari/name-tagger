@@ -1,12 +1,14 @@
 #![feature(plugin)]
+#![plugin(docopt_macros)]
 
 extern crate collections;
 
 extern crate docopt;
-extern crate "rustc-serialize" as rustc_serialize;
-#[plugin] extern crate docopt_macros;
+extern crate rustc_serialize as rustc_serialize;
 
-use std::io::{BufferedReader, File};
+use std::io::{BufReader, BufRead};
+use std::fs::File;
+use std::path::Path;
 use suffix_tree::{SuffixTree, Cursor};
 
 docopt!(Args, "
@@ -28,7 +30,7 @@ fn is_punctuation(ch: char) -> bool {
     punct.contains_char(ch)
 }
 
-#[derive(Show, Copy)]
+#[derive(Debug, Copy)]
 enum TermType {
     Exact, Fuzzy, WholeWord, FuzzyWholeWord
 }
@@ -49,8 +51,8 @@ pub fn main() {
     let fuzzy = args.flag_insensitive;
 
     // read in dictionary
-    let dict_path = Path::new(args.arg_DICT);
-    let mut dict_reader = BufferedReader::new(File::open(&dict_path));
+    let dict_path = Path::new(&args.arg_DICT);
+    let mut dict_reader = BufReader::new(File::open(&dict_path).unwrap());
     let mut dict: STree = SuffixTree::new();
     for i in dict_reader.lines() {
         let i = i.unwrap();
