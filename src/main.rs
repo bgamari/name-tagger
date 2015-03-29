@@ -4,7 +4,7 @@
 extern crate collections;
 
 extern crate docopt;
-extern crate rustc_serialize as rustc_serialize;
+extern crate rustc_serialize;
 
 use std::io::{BufReader, BufRead};
 use std::fs::File;
