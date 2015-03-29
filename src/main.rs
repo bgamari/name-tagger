@@ -100,7 +100,8 @@ pub fn main() {
         }
     }
 
-    for line in std::io::stdin().lock().lines() {
+    let stdin = std::io::stdin();
+    for line in stdin.lock().lines() {
         use std::iter::FromIterator;
         let line = line.unwrap();
         let line = line.as_slice().trim_right_matches('\n');
