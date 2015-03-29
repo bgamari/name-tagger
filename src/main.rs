@@ -37,12 +37,17 @@ enum TermType {
 
 type STree = SuffixTree<char, (TermType, String)>;
 
-pub fn normalize(ch: char) -> char {
-    if is_punctuation(ch) {
-        '.'
-    } else {
-        ch.to_lowercase()
-    }
+
+pub fn normalizeStr(str: String) -> String {
+    let mut output:String = String::with_capacity(1.1*str.length);
+    for ch in str.into_iter(){
+        if is_punctuation(ch) {
+            output.push('.');
+        } else {
+            output.extend(ch.to_lowercase());
+        }
+	}
+	output
 }
 
 pub fn main() {
@@ -67,14 +72,14 @@ pub fn main() {
                                 (TermType::WholeWord, parts[0].to_string()));
 
                     if fuzzy {
-                        let normalized = t.into_iter().map(|ch| normalize(ch));
+                        let normalized = normalizeStr(t);
                         dict.insert(Some(' ').into_iter().chain(normalized).chain(Some(' ').into_iter()),
                                     (TermType::FuzzyWholeWord, parts[0].to_string()));
                     }
                 } else {
                     dict.insert(t.clone().into_iter(), (TermType::Exact, parts[0].to_string()));
                     if fuzzy {
-                        let normalized = t.into_iter().map(|ch| normalize(ch));
+                        let normalized = normalizeStr(t);
                         dict.insert(normalized, (TermType::Fuzzy, parts[0].to_string()));
                     }
                 }
@@ -103,7 +108,7 @@ pub fn main() {
         let matches =
             find_matches(&dict,
                          Some(' ').into_iter()
-                         .chain(line.chars().map(|ch| normalize(ch)))
+                         .chain(normalizeStr(line).into_iter())
                          .chain(Some(' ').into_iter()));
 
         for m in matches.into_iter() {
