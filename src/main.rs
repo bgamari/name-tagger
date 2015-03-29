@@ -92,7 +92,8 @@ pub fn main() {
             find_matches(&dict,
                          Some(' ').into_iter()
                          .chain(line.chars())
-                         .chain(Some(' ').into_iter()));
+                         .chain(Some(' ').into_iter())
+                         .map(|x| Some(x)));
 
         for m in matches.into_iter() {
             let &(ty, ref value) = m.node.value.as_ref().unwrap();
@@ -104,8 +105,9 @@ pub fn main() {
         let matches =
             find_matches(&dict,
                          Some(' ').into_iter()
-                         .chain(normalizeStr(line).into_iter())
-                         .chain(Some(' ').into_iter()));
+                         .chain(normalize(line.chars()))
+                         .chain(Some(' ').into_iter())
+                         .map(|x| Some(x)));
 
         for m in matches.into_iter() {
             let &(ty, ref value) = m.node.value.as_ref().unwrap();
@@ -124,32 +126,37 @@ struct Match<'a, V: 'a> {
     node: &'a SuffixTree<char, V>,
 }
 
-fn find_matches<'a, Iter: Iterator<Item=char>, V>
+fn find_matches<'a, Iter: Iterator<Item=Option<char>>, V>
     (dict: &'a SuffixTree<char, V>,
      iter: Iter) -> Vec<Match<'a, V>> {
 
     let mut cands: Vec<Candidate<V>> = Vec::new();
     let mut matches: Vec<Match<V>> = Vec::new();
-    for (offset, ch) in iter.enumerate() {
-        cands.push(Candidate {cursor: Cursor::new(dict)});
+    for (offset, ch_opt) in iter.enumerate() {
+        match ch_opt {
+            Some(ch) => {
+                cands.push(Candidate {cursor: Cursor::new(dict)});
 
-        cands = cands.into_iter().flat_map(|cand: Candidate<'a, V>| {
-            match cand.cursor.clone().go(ch) {
-                Some(next) => vec!(Candidate {cursor: next}),
-                None => vec!(),
-            }.into_iter()
-        }).collect();
+                cands = cands.into_iter().flat_map(|cand: Candidate<'a, V>| {
+                    match cand.cursor.clone().go(ch) {
+                        Some(next) => vec!(Candidate {cursor: next}),
+                        None => vec!(),
+                    }.into_iter()
+                }).collect();
 
-        for cand in cands.iter() {
-            if cand.cursor.get().is_terminal() {
-                // we have a hit
-                matches.push(Match{
-                    start: 1 + offset - cand.cursor.path.len(),
-                    end: 1 + offset,
-                    seq: cand.cursor.path.clone(),
-                    node: cand.cursor.get(),
-                });
+                for cand in cands.iter() {
+                    if cand.cursor.get().is_terminal() {
+                        // we have a hit
+                        matches.push(Match{
+                            start: 1 + offset - cand.cursor.path.len(),
+                            end: 1 + offset,
+                            seq: cand.cursor.path.clone(),
+                            node: cand.cursor.get(),
+                        });
+                    }
+                }
             }
+            None => ()
         }
     }
     matches
