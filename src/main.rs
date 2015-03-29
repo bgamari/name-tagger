@@ -9,6 +9,7 @@ extern crate rustc_serialize;
 use std::io::{BufReader, BufRead};
 use std::fs::File;
 use std::path::Path;
+use std::char::ToLowercase;
 use suffix_tree::{SuffixTree, Cursor};
 
 docopt!(Args, "
@@ -37,17 +38,28 @@ enum TermType {
 
 type STree = SuffixTree<char, (TermType, String)>;
 
+enum Normalize<Iter: Iterator<Item=char>> {
+    Char {nextChar: Iter},
+    Lower {nextChar: ToLowercase, remaining: Iter}
+}
 
-pub fn normalizeStr(str: String) -> String {
-    let mut output:String = String::with_capacity(1.1*str.length);
-    for ch in str.into_iter(){
-        if is_punctuation(ch) {
-            output.push('.');
-        } else {
-            output.extend(ch.to_lowercase());
+impl<Iter: Iterator<Item=char>> Iterator for Normalize<Iter> {
+    type Item = char;
+    fn next(&mut self) -> Option<char> {
+        match self {
+            &mut Normalize::Char {nextChar: ref mut next} => next.next(),
+            &mut Normalize::Lower {nextChar: ref mut next, remaining: ref mut rem} => {
+                match next.next() {
+                    None => rem.next(),
+                    ch => ch
+                }
+            }
         }
-	}
-	output
+    }
+}
+
+fn normalize<Iter: Iterator<Item=char>>(str: Iter) -> Normalize<Iter> {
+    Normalize::Char {nextChar: str}
 }
 
 pub fn main() {
@@ -72,14 +84,14 @@ pub fn main() {
                                 (TermType::WholeWord, parts[0].to_string()));
 
                     if fuzzy {
-                        let normalized = normalizeStr(t);
+                        let normalized = normalize(t.into_iter());
                         dict.insert(Some(' ').into_iter().chain(normalized).chain(Some(' ').into_iter()),
                                     (TermType::FuzzyWholeWord, parts[0].to_string()));
                     }
                 } else {
                     dict.insert(t.clone().into_iter(), (TermType::Exact, parts[0].to_string()));
                     if fuzzy {
-                        let normalized = normalizeStr(t);
+                        let normalized = normalize(t.into_iter());
                         dict.insert(normalized, (TermType::Fuzzy, parts[0].to_string()));
                     }
                 }
