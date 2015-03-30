@@ -23,6 +23,7 @@ Options:
 #[derive(Clone)]
 struct Candidate<'a, V: 'a> {
     cursor: Cursor<'a, char, V>,
+    start: usize,
 }
 
 
@@ -33,7 +34,7 @@ fn is_punctuation(ch: char) -> bool {
 
 #[derive(Debug, Copy)]
 enum TermType {
-    Exact, Fuzzy, WholeWord, FuzzyWholeWord
+    Exact, Fuzzy, WholeWord, FuzzyWholeWord, WholeWordWithSymbols
 }
 
 type STree = SuffixTree<char, (TermType, String)>;
@@ -96,7 +97,7 @@ pub fn main() {
                          Some(' ').into_iter()
                          .chain(line.chars())
                          .chain(Some(' ').into_iter())
-                         .map(|x| Some(x)));
+            );
 
         for m in matches.into_iter() {
             let &(ty, ref value) = m.node.value.as_ref().unwrap();
@@ -110,7 +111,7 @@ pub fn main() {
                          Some(' ').into_iter()
                          .chain(normalize(line.chars()))
                          .chain(Some(' ').into_iter())
-                         .map(|x| Some(x)));
+            );
 
         for m in matches.into_iter() {
             let &(ty, ref value) = m.node.value.as_ref().unwrap();
@@ -129,41 +130,180 @@ struct Match<'a, V: 'a> {
     node: &'a SuffixTree<char, V>,
 }
 
-fn find_matches<'a, Iter: Iterator<Item=Option<char>>, V>
+fn find_matches<'a, Iter: Iterator<Item=char>, V>
     (dict: &'a SuffixTree<char, V>,
-     iter: Iter) -> Vec<Match<'a, V>> {
+     input: Iter) -> Vec<Match<'a, V>> {
 
     let mut cands: Vec<Candidate<V>> = Vec::new();
     let mut matches: Vec<Match<V>> = Vec::new();
-    for (offset, ch_opt) in iter.enumerate() {
-        match ch_opt {
-            Some(ch) => {
-                cands.push(Candidate {cursor: Cursor::new(dict)});
+    for (offset, ch) in input.enumerate() {
+		cands.push(Candidate {cursor: Cursor::new(dict), start: offset, term_type_downgraded = false});
 
-                cands = cands.into_iter().flat_map(|cand: Candidate<'a, V>| {
-                    match cand.cursor.clone().go(ch) {
-                        Some(next) => vec!(Candidate {cursor: next}),
-                        None => vec!(),
-                    }.into_iter()
-                }).collect();
+		cands = cands.into_iter().flat_map(|cand: Candidate<'a, V>| {
+			match cand.cursor.clone().go(ch) {
+				Some(next) => vec!(Candidate {cursor: next, start: cand.start, term_type_downgraded = cand.term_type_downgraded}),
+				None => vec!(),
+//                None => if(skipSymbol) { vec!(Candidate {cursor: next, start: cand.start, term_type_downgraded = true}) }
+			}.into_iter()
+		}).collect();
 
-                for cand in cands.iter() {
-                    if cand.cursor.get().is_terminal() {
-                        // we have a hit
-                        matches.push(Match{
-                            start: 1 + offset - cand.cursor.path.len(),
-                            end: 1 + offset,
-                            seq: cand.cursor.path.clone(),
-                            node: cand.cursor.get(),
-                        });
-                    }
-                }
-            }
-            None => ()
-        }
+		for cand in cands.iter() {
+			if cand.cursor.get().is_terminal() {
+				// we have a hit
+				matches.push(Match{
+					start: cand.start,
+					end: 1 + offset,
+					seq: cand.cursor.path.clone(),
+					node: cand.cursor.get(),
+				});
+			}
+		}
     }
     matches
 }
+
+
+trait Matcher {
+    fn feed(offset:usize, ch:char) -> Vec<Match>;
+}
+
+struct ExactMatcher {
+    tree: &SuffixTree,
+	cands: Vec<Candidate>,
+}
+impl Matcher for ExactMatcher {
+    fn feed(offset:usize, ch:char) -> Vec<Match> {
+        let mut matches = Vec::new();
+		cands.push(Candidate {cursor: Cursor::new(dict), start: offset});
+
+		cands = cands.into_iter().flat_map(|cand: Candidate<'a, V>| {
+			match cand.cursor.clone().go(ch) {
+				Some(next) => vec!(Candidate {cursor: next, start: cand.start}),
+				None => vec!(),
+				//                None => if(skipSymbol) { vec!(Candidate {cursor: next, start: cand.start, term_type_downgraded = true}) }
+			}.into_iter()
+		}).collect();
+
+		for cand in cands.iter() {
+			if cand.cursor.get().is_terminal() {
+				// we have a hit
+				matches.push(Match{
+					start: cand.start,
+					end: 1 + offset,
+					seq: cand.cursor.path.clone(),
+					node: cand.cursor.get(),
+				});
+			}
+		}
+    }
+}
+
+struct Candidate<'a, V: 'a> {
+cursor: Cursor<'a, char, V>,
+start: usize,
+}
+
+fn consume_iterator<Iter: Iterator<Item=char>>(iter: Iter, mut localcursor: Cursor) -> Option<Cursor> {
+	for lch in iter {
+		match localcursor.go(lch) {
+			Some(cur) => localcursor = cur,
+			None => return None
+		}
+	}
+	Some(cur)
+}
+
+fn consumeLowerCase(ch: char, mut localcursor: Cursor) -> Option<Cursor> {
+    consume_iterator(ch.to_lowercase, localcursor)
+}
+
+fn consumeSkipSpace(ch:char, mut localcursor:Cursor) -> Option<Cursor> {
+    if(ch.is_whitespace() || ch.is_newline()) {
+		if(localcursor.head == ' ') {
+			return localcursor
+		}
+	}
+}
+
+fn consumeSkip(ch:char) -> Option<Cursor> {
+
+}
+
+trait MyCandidate {
+    fn consume(ch:char) -> Vec<MyCandidate>
+}
+impl ExactCandidate {
+    fn consume(ch:char) -> Vec<MyCandidate> {
+        match cand.cursor.clone().go(ch) {
+            Some(next) => vec!(ExactCandidate{cursor:next, start:cand.start}})
+            None => {
+			    vec!(
+                    SpaceSkipCandidate{cursor:cand.cursor.clone(), start:cand.start}.consume(ch),
+                    LowerCaseCandidate{cursor:cand.cursor.clone(), start:cand.start}.consume(ch),
+                );
+			}
+        }
+    }
+}
+impl LowerCaseCandidate {
+    fn consume(ch:char) -> Vec<MyCandidate> {
+		match consumeLowerCase(ch, cand.cursor.clone()) {
+			Some(next) => vec!(LowerCaseCandidate{cursor:next, start:cand.start}})
+			None => {
+				vec!(
+				SpaceSkipLowerCaseCandidate{cursor:cand.cursor.clone(), start:cand.start}.consume(ch),
+				);
+			}
+		}
+
+    }
+}
+
+impl SpaceSkipCandidate {
+    fn consume(ch:char) -> Vec<MyCandidate> {
+        let localcursor = cand.cursor.clone();
+        if(cand.cursor.head == ' ') {
+			while(localcursor.go(' ').is_some()){}
+		}
+		match localcursor.go(ch) {
+			Some(next) => vec!(SpaceSkipCandidate{cursor:localcursor, start:cand.start})
+			None => vec!(SpaceSymbolSkipCandidate{cursor:localcursor, start:cand.start})
+		}
+
+    }
+}
+
+
+impl SpaceSkipLowerCaseCandidate {
+	fn consume(ch:char) -> Vec<MyCandidate> {
+		let mut localcursor = cand.cursor.clone();
+		if(cand.cursor.head == ' ') {
+			while(localcursor.go(' ').is_some()){}
+		}
+		for(lch in ch.to_lowercase()) {
+			match localcursor.go(lch) {
+				Some(cur) => localcursor = cur,
+				None => return vec!()
+			}
+		}
+		vec!(SpaceSkipLowerCaseCandidate{cursor:localcursor, start:cand.start})
+	}
+}
+
+impl SpaceSymbolSkipLowerCaseCandidate {
+	fn consume(ch:char) -> Vec<MyCandidate> {
+		let localcursor = cand.cursor.clone();
+		if(cand.cursor.head.is_space() || cand.cursor.head.is_symbol()) {
+			while(localcursor.go(' ').is_some() || localcursor.go('.').is_some()){}
+		}
+		match ch.to_lowercase().map(|lch| localcursor.go(lch)).last()) { // brrrr
+			Some(next) => vec!(SpaceSymbolSkipLowerCaseCandidate{cursor:localcursor, start:cand.start})
+			None => vec!()
+		}
+
+	}
+}
+
 
 pub mod suffix_tree {
     use collections::BTreeMap;
